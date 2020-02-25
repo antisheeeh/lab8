@@ -22,6 +22,7 @@ NOTE2* findNote(NOTE2** BLOCKNOTE, char* phoneNumber, int numberOfLines);
 void printNote(NOTE2* NOTE);
 void freeBlocknoteArray(NOTE2** BLOCKNOTE, int numberOfLines);
 void freeFullTextArray(char*** fullText, int numberOfLines);
+void freeLine(char** line, int numberOfWords);
 void fillNote(NOTE2** NOTE, char** wordsInLine);
 
 int main() {
@@ -58,10 +59,10 @@ int main() {
             freeFullTextArray(fullText, numberOfLines);
             freeBlocknoteArray(BLOCKNOTE, numberOfLines);
         }
-    }
 
-    if(fclose(inputFile) == EOF) {
-        puts("Cannot close csv file");
+        if(fclose(inputFile) == EOF) {
+            puts("Cannot close csv file");
+        }
     }
 
     return 0;
@@ -116,6 +117,7 @@ int splitLine(char* line, char*** wordsInLine, char* sep) {
 
             if((*wordsInLine)[i] == NULL) {
                 code == ERROR;
+                freeLine(wordsInLine[i], i);
             } else {
                 strcpy((*wordsInLine)[i], word);
                 word = strtok(NULL, sep);
@@ -168,17 +170,23 @@ void freeFullTextArray(char*** fullText, int numberOfLines) {
     int i, j;
 
     for(i = 0; i < numberOfLines; ++i) {
-        for(j = 0; j < NUMBER_OF_WORDS_IN_LINE; ++j) {
-            free(fullText[i][j]);
-            fullText[i][j] = NULL;
-        }
-
-        free(fullText[i]);
-        fullText[i] = NULL; 
+        freeLine(fullText[i], NUMBER_OF_WORDS_IN_LINE);
     }
 
     free(fullText);
     fullText = NULL;
+}
+
+void freeLine(char** line, int numberOfWords) {
+    int i;
+
+    for(i = 0; i < numberOfWords; ++i) {
+        free(line[i]);
+        line[i] = NULL;
+    }
+
+    free(line);
+    line = NULL;
 }
 
 int readBlocknote(char**** fullText, int numberOfLines, FILE* inputFile) {
@@ -192,6 +200,7 @@ int readBlocknote(char**** fullText, int numberOfLines, FILE* inputFile) {
         
         if(splitLine(line, &wordsInLine, sep) == ERROR) {
             code = ERROR;
+            freeFullTextArray(*fullText, i);
         } else {
             (*fullText)[i] = wordsInLine;
         }
