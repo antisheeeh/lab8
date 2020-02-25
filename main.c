@@ -14,16 +14,16 @@ typedef struct NOTE2 {
 } NOTE2;
 
 int countNumberOfLines(FILE* file);
-int splitLine(char* line, char*** wordsInLine, char* sep);
 int readBlocknote(char**** fullText, int numberOfLines, FILE* inputFile);
-void fillBlocknote(NOTE2** BLOCKNOTE, char*** fullText, int numberOfLines);
+int splitLine(char* line, char*** wordsInLine, char* sep);
 void sortFullText(char*** fullText, int numberOfLines);
+int fillBlocknote(NOTE2** BLOCKNOTE, char*** fullText, int numberOfLines);
+int fillNote(NOTE2** NOTE, char** wordsInLine);
 NOTE2* findNote(NOTE2** BLOCKNOTE, char* phoneNumber, int numberOfLines);
 void printNote(NOTE2* NOTE);
 void freeBlocknoteArray(NOTE2** BLOCKNOTE, int numberOfLines);
 void freeFullTextArray(char*** fullText, int numberOfLines);
 void freeLine(char** line, int numberOfWords);
-void fillNote(NOTE2** NOTE, char** wordsInLine);
 
 int main() {
     NOTE2 **BLOCKNOTE, *NOTE;
@@ -39,25 +39,28 @@ int main() {
         if(numberOfLines == 0) {
             puts("File is empty");
         } else if((BLOCKNOTE = malloc(sizeof(*BLOCKNOTE) * numberOfLines)) == NULL) {
-            puts("Cannot allocate memory for lines of BLOCKNOTE");
+            puts("Cannot allocate memory");
         } else if(readBlocknote(&fullText, numberOfLines, inputFile) == ERROR) {
-            puts("Cannot read BLOCKNOTE");
+            puts("Cannot allocate memory");
         } else {
             sortFullText(fullText, numberOfLines);
-            fillBlocknote(BLOCKNOTE, fullText, numberOfLines);
 
-            puts("Enter your phone number: ");
-            fgets(line, MAX_LENGTH, stdin);
-            line[strlen(line) - 1] = '\0';
-
-            if((NOTE = findNote(BLOCKNOTE, line, numberOfLines)) == NULL) {
-                puts("No person found with this phone number");
+            if(fillBlocknote(BLOCKNOTE, fullText, numberOfLines) == ERROR) {
+                puts("Cannot allocate memory");
             } else {
-                printNote(NOTE);
-            }
+                puts("Enter your phone number: ");
+                fgets(line, MAX_LENGTH, stdin);
+                line[strlen(line) - 1] = '\0';
 
-            freeFullTextArray(fullText, numberOfLines);
-            freeBlocknoteArray(BLOCKNOTE, numberOfLines);
+                if((NOTE = findNote(BLOCKNOTE, line, numberOfLines)) == NULL) {
+                    puts("No person found with this phone number");
+                } else {
+                    printNote(NOTE);
+                }
+
+                freeFullTextArray(fullText, numberOfLines);
+                freeBlocknoteArray(BLOCKNOTE, numberOfLines);
+            }
         }
 
         if(fclose(inputFile) == EOF) {
@@ -78,23 +81,28 @@ int countNumberOfLines(FILE* file) {
     return numberOfLines;
 }
 
-void freeBlocknoteArray(NOTE2** BLOCKNOTE, int numberOfLines) {
-    int i;
+int readBlocknote(char**** fullText, int numberOfLines, FILE* inputFile) {
+    char line[MAX_LENGTH], *sep = ";", **wordsInLine;
+    int i, code = SUCCESS;
 
-    for(i = 0; i < numberOfLines; ++i) {
-        free(BLOCKNOTE[i]);
-        BLOCKNOTE[i] = NULL;
+    *fullText = malloc(sizeof(**fullText) * numberOfLines);
+
+    if(fullText == NULL) {
+        code == ERROR;
     }
-    
-    free(*BLOCKNOTE);
-    *BLOCKNOTE = NULL;
 
-    free(BLOCKNOTE);
-    BLOCKNOTE = NULL;
-}
+    for(i = 0; i < numberOfLines && code != ERROR; ++i) {
+        fgets(line, MAX_LENGTH, inputFile);
+        
+        if(splitLine(line, &wordsInLine, sep) == ERROR) {
+            code = ERROR;
+            freeFullTextArray(*fullText, i);
+        } else {
+            (*fullText)[i] = wordsInLine;
+        }
+    }
 
-void printNote(NOTE2* NOTE) {
-    printf("Surname and initials: %s Phone number: %s Date of Birth: %s\n", NOTE->Name, NOTE->TELE, NOTE->DATE);
+    return code;
 }
 
 int splitLine(char* line, char*** wordsInLine, char* sep) {
@@ -105,26 +113,66 @@ int splitLine(char* line, char*** wordsInLine, char* sep) {
 
     if(*wordsInLine == NULL) {
         code = ERROR;
-    } else {
-        for(i = 0, word = strtok(line, sep); word != NULL && code != ERROR; ++i) {
-            if(i == NUMBER_OF_WORDS_IN_LINE - 1) {
-                word[strlen(word) - 1] = '\0';
-            } else {
-                word[strlen(word)] = '\0';
-            }
+    }
 
-            (*wordsInLine)[i] = malloc(sizeof(**wordsInLine[i]) * (strlen(word) + 1));
+    for(i = 0, word = strtok(line, sep); code != ERROR && word != NULL; ++i) {
+        if(i == NUMBER_OF_WORDS_IN_LINE - 1) {
+            word[strlen(word) - 1] = '\0';
+        } else {
+            word[strlen(word)] = '\0';
+        }
 
-            if((*wordsInLine)[i] == NULL) {
-                code == ERROR;
-                freeLine(wordsInLine[i], i);
-            } else {
-                strcpy((*wordsInLine)[i], word);
-                word = strtok(NULL, sep);
-            }
+        (*wordsInLine)[i] = malloc(sizeof(**wordsInLine[i]) * (strlen(word) + 1));
+
+        if((*wordsInLine)[i] == NULL) {
+            code == ERROR;
+            freeLine(wordsInLine[i], i);
+        } else {
+            strcpy((*wordsInLine)[i], word);
+            word = strtok(NULL, sep);
         }
     }
     
+    return code;
+}
+
+void sortFullText(char*** fullText, int numberOfLines) {
+    int i, j;
+    char** tempLine;
+
+    for(i = 1; i < numberOfLines; ++i) {
+        tempLine = fullText[i];
+        for(j = i - 1; j >= 0 && strcmp(fullText[j][0], tempLine[0]) > 0; --j) fullText[j + 1] = fullText[j];
+        fullText[j + 1] = tempLine;
+    }
+}
+
+int fillBlocknote(NOTE2** BLOCKNOTE, char*** fullText, int numberOfLines) {
+    int i, code = SUCCESS;
+
+    for(i = 0; code != ERROR && i < numberOfLines; ++i) {
+        if(fillNote(&BLOCKNOTE[i], fullText[i]) == ERROR) {
+            code = ERROR;
+            freeBlocknoteArray(BLOCKNOTE, i);
+        }
+    }
+
+    return code;
+}
+
+int fillNote(NOTE2** NOTE, char** wordsInLine) {
+    int code = SUCCESS;
+
+    *NOTE = malloc(sizeof(**NOTE));
+
+    if(*NOTE == NULL) {
+        code = ERROR;
+    } else {
+        (*NOTE)->Name = wordsInLine[0];
+        (*NOTE)->TELE = wordsInLine[1];
+        (*NOTE)->DATE = wordsInLine[2];
+    }
+
     return code;
 }
 
@@ -141,29 +189,20 @@ NOTE2* findNote(NOTE2** BLOCKNOTE, char* phoneNumber, int numberOfLines) {
     return NOTE;
 }
 
-void sortFullText(char*** fullText, int numberOfLines) {
-    int i, j;
-    char** tempLine;
-
-    for(i = 1; i < numberOfLines; ++i) {
-        tempLine = fullText[i];
-        for(j = i - 1; j >= 0 && strcmp(fullText[j][0], tempLine[0]) > 0; --j) fullText[j + 1] = fullText[j];
-        fullText[j + 1] = tempLine;
-    }
+void printNote(NOTE2* NOTE) {
+    printf("Surname and initials: %s Phone number: %s Date of Birth: %s\n", NOTE->Name, NOTE->TELE, NOTE->DATE);
 }
 
-void fillBlocknote(NOTE2** BLOCKNOTE, char*** fullText, int numberOfLines) {
+void freeBlocknoteArray(NOTE2** BLOCKNOTE, int numberOfLines) {
     int i;
 
-    for(i = 0; i < numberOfLines; ++i) fillNote(&BLOCKNOTE[i], fullText[i]);
-}
+    for(i = 0; i < numberOfLines; ++i) {
+        free(BLOCKNOTE[i]);
+        BLOCKNOTE[i] = NULL;
+    }
 
-void fillNote(NOTE2** NOTE, char** wordsInLine) {
-    *NOTE = malloc(sizeof **NOTE);
-
-    (*NOTE)->Name = wordsInLine[0];
-    (*NOTE)->TELE = wordsInLine[1];
-    (*NOTE)->DATE = wordsInLine[2];
+    free(BLOCKNOTE);
+    BLOCKNOTE = NULL;
 }
 
 void freeFullTextArray(char*** fullText, int numberOfLines) {
@@ -187,24 +226,4 @@ void freeLine(char** line, int numberOfWords) {
 
     free(line);
     line = NULL;
-}
-
-int readBlocknote(char**** fullText, int numberOfLines, FILE* inputFile) {
-    char line[MAX_LENGTH], *sep = ";", **wordsInLine;
-    int i, code = SUCCESS;
-
-    *fullText = malloc(sizeof(**fullText) * numberOfLines);
-
-    for(i = 0; i < numberOfLines && code != ERROR; ++i) {
-        fgets(line, MAX_LENGTH, inputFile);
-        
-        if(splitLine(line, &wordsInLine, sep) == ERROR) {
-            code = ERROR;
-            freeFullTextArray(*fullText, i);
-        } else {
-            (*fullText)[i] = wordsInLine;
-        }
-    }
-
-    return code;
 }
